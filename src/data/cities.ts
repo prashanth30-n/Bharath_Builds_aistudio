@@ -252,7 +252,7 @@ export const SEED_REST_POINTS: Record<string, RestPoint[]> = {
       source: 'rider',
       verified: true,
       verifiedByCount: 35,
-      notes: 'Protected from sun, near Swiggy Instamart hub',
+      notes: 'Protected from sun, near grocery quick-commerce delivery hub',
     },
   ],
   mumbai: [

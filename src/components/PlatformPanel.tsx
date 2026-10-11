@@ -38,7 +38,7 @@ export const PlatformPanel: React.FC<PlatformPanelProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
           <span className="px-3 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-full text-[10px] font-black uppercase tracking-wider">
-            PLATFORM DISPATCH PROPOSAL (SWIGGY / ZOMATO / BLINKIT)
+            FLEET & PLATFORM DISPATCH INTEGRATION
           </span>
           <h3 className="text-lg sm:text-xl font-black text-slate-900 mt-1.5">
             Heat-Aware Fleet Dispatch & Hazard Allocation

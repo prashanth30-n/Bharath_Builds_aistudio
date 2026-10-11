@@ -49,7 +49,7 @@ export default function App() {
   const [showAwsModal, setShowAwsModal] = useState(false);
   const [viewMode, setViewMode] = useState<'phone' | 'wide'>('phone');
 
-  // Rapido / Gig Captain Real-World Features
+  // Rider & Captain Duty Real-World Features
   const [captainStatus, setCaptainStatus] = useState<CaptainDutyStatus>('idle_waiting');
   const [idleWaitingMinutes, setIdleWaitingMinutes] = useState(6);
   const [hazardSurgeEarnings, setHazardSurgeEarnings] = useState(125);
@@ -326,7 +326,7 @@ export default function App() {
       return;
     }
 
-    // 2. Idle Waiting Nudge for Rapido / Delivery Captain
+    // 2. Idle Waiting Nudge for Rider / Captain
     if (isIdleWaiting && idleWaitingMinutes >= 5 && wbgt >= 31) {
       const shadePoint = points.find(p => p.kind === 'shade' || p.kind === 'rest') || points[0];
       const dist = shadePoint ? Math.round(calculateDistanceMeters(lat, lon, shadePoint.lat, shadePoint.lon)) : 120;
@@ -523,7 +523,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile App Header (Rapido Captain Style) */}
+        {/* Mobile App Header */}
         <header className="bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-[1500] shadow-md shadow-amber-500/10 select-none">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-white text-amber-700 font-black text-sm flex items-center justify-center shadow-md">
@@ -533,7 +533,7 @@ export default function App() {
               <div className="flex items-center gap-1.5">
                 <span className="font-black text-base tracking-tight text-white drop-shadow-sm">SurakshaRide</span>
                 <span className="text-[10px] bg-white/25 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-xs">
-                  RAPIDO CAPTAIN
+                  FLEET CAPTAIN
                 </span>
               </div>
               <div className="text-[11px] text-amber-100 font-semibold flex items-center gap-1.5">
@@ -718,10 +718,10 @@ export default function App() {
               </div>
             )}
 
-            {/* Bottom Card for Drivers: Rapido Captain Status & Shift Actions */}
+            {/* Bottom Card for Drivers: Captain Duty Status & Shift Actions */}
             <div className="p-3 bg-white/95 backdrop-blur-xl border-t border-amber-200/80 shadow-2xl z-20 space-y-2.5">
               
-              {/* Captain Duty Selector (Realistic Rapido Workflow) */}
+              {/* Captain Duty Selector (Realistic Field Workflow) */}
               <div className="flex items-center justify-between bg-amber-50/80 p-1 rounded-2xl border border-amber-200 text-xs">
                 <button
                   onClick={() => setCaptainStatus('idle_waiting')}
@@ -842,11 +842,11 @@ export default function App() {
                 onUnwellClick={handleUnwellTrigger}
               />
 
-              {/* Rapido Hazard Surcharge Bonus Card */}
+              {/* Heat Hazard Surcharge Bonus Card */}
               <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-4 text-white shadow-lg shadow-orange-500/20 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
-                    RAPIDO HEAT HAZARD SURCHARGE
+                    HEAT HAZARD SURCHARGE
                   </span>
                   <span className="font-mono font-black text-sm">+₹25 / TRIP ACTIVE</span>
                 </div>
@@ -922,11 +922,11 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 4: RAPIDO DUTY & REAL GPS TRACKING */}
+          {/* TAB 4: CAPTAIN DUTY & REAL GPS TRACKING */}
           {activeTab === 'duty' && (
             <div className="flex-1 p-4 overflow-y-auto space-y-4">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Rapido Captain Duty & GPS</h3>
+                <h3 className="text-lg font-black text-slate-900">Captain Duty & GPS Telemetry</h3>
                 <p className="text-xs text-slate-500 font-medium">Real-world driver telemetry & simulation controls</p>
               </div>
 
@@ -984,10 +984,10 @@ export default function App() {
               <div className="bg-amber-50 border border-amber-200 rounded-3xl p-4 text-xs text-amber-900 space-y-2">
                 <div className="font-black flex items-center gap-1.5 text-sm">
                   <span>💡</span>
-                  <span>Rapido Captain Field Safety:</span>
+                  <span>Captain Field Safety Protocol:</span>
                 </div>
                 <p className="leading-relaxed text-slate-700">
-                  When waiting at street signals or auto stands, switch status to <b>Waiting at Stand</b>. If you remain stationary under direct 42°C sun for more than 5 minutes, SurakshaRide speaks in Hindi or English to guide you to shaded parking with free drinking water within 150 meters.
+                  When waiting at street signals or vehicle stands, switch status to <b>Waiting at Stand</b>. If you remain stationary under direct 42°C sun for more than 5 minutes, SurakshaRide speaks in Hindi or English to guide you to shaded parking with free drinking water within 150 meters.
                 </p>
               </div>
             </div>
@@ -1147,26 +1147,33 @@ export default function App() {
             </div>
 
             {/* Google Maps API Key Input */}
-            <div className="space-y-1.5 bg-amber-50/60 p-3.5 rounded-2xl border border-amber-200">
+            <div className="space-y-2 bg-amber-50/70 p-4 rounded-2xl border border-amber-200">
               <div className="flex items-center justify-between text-xs font-black text-amber-900">
-                <span>Google Maps API Key:</span>
-                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
-                  Configured ✓
+                <span>Google Maps JavaScript API Key:</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  apiKeyInput.trim() 
+                    ? 'text-emerald-700 bg-emerald-100' 
+                    : 'text-amber-800 bg-amber-200/80'
+                }`}>
+                  {apiKeyInput.trim() ? 'Configured ✓' : 'Optional (Free Map Available)'}
                 </span>
               </div>
               <input
                 type="text"
                 value={apiKeyInput}
                 onChange={e => setApiKeyInput(e.target.value)}
-                placeholder="AIzaSy..."
+                placeholder="AIzaSy... (from Google Cloud Console)"
                 className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
-              <div className="text-[11px] text-slate-600 leading-relaxed pt-1 space-y-1">
+              <div className="text-[11px] text-slate-600 leading-relaxed pt-1 space-y-1.5">
                 <p>
-                  Your key <code className="font-mono text-amber-800 font-bold bg-amber-100/80 px-1 py-0.5 rounded">AIzaSyB6g...</code> is loaded.
+                  🔑 <strong>Which Key:</strong> From Google Cloud Console &rarr; <strong>Maps JavaScript API</strong> (starts with <code className="font-mono text-amber-800 font-bold bg-amber-100/80 px-1 py-0.5 rounded">AIzaSy...</code>).
                 </p>
                 <p className="text-[10px] text-slate-500">
-                  💡 Note: If Google Cloud displays an authorization note (due to domain/referrer settings in GCP Console), the app automatically falls back to the HD Thermal Radar map so your live GPS navigation is never interrupted!
+                  ✨ <strong>No Key?</strong> Select the <strong>&ldquo;Road + Thermal Radar&rdquo;</strong> option above. It runs 100% free with live thermal heatmaps, GPS, shade stops, and surge zones with zero API keys required!
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  🌐 <strong>For Render Hosting:</strong> Add <code className="font-mono text-slate-700 bg-slate-200/60 px-1 rounded">VITE_GOOGLE_MAPS_API_KEY</code> in Render &rarr; Environment variables.
                 </p>
               </div>
             </div>

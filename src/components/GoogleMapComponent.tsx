@@ -44,6 +44,15 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
   // Initialize Google Maps Script
   useEffect(() => {
     let isMounted = true;
+
+    if (!apiKey || !apiKey.trim()) {
+      setIsLoading(false);
+      setAuthErrorNotice(
+        'A Google Maps JavaScript API key is required to render Google Maps. You can enter your key in settings, or switch to the built-in Road + Thermal Radar which needs zero API keys!'
+      );
+      return;
+    }
+
     setIsLoading(true);
     setAuthErrorNotice(null);
 

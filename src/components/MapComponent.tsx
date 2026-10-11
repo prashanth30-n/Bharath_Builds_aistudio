@@ -14,7 +14,7 @@ interface MapComponentProps {
   isVisible?: boolean;
 }
 
-export type MapStyleType = 'voyager' | 'satellite' | 'osm';
+export type MapStyleType = 'streets' | 'satellite' | 'osm';
 export type HeatmapMode = 'radar' | 'surge' | 'shade' | 'grid';
 
 export const MapComponent: React.FC<MapComponentProps> = ({
@@ -37,7 +37,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   const routeLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const gridShapesLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  const [mapStyle, setMapStyle] = useState<MapStyleType>('voyager');
+  const [mapStyle, setMapStyle] = useState<MapStyleType>('streets');
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('radar');
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [inspectCoords, setInspectCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -83,7 +83,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       const grad = ctx.createRadialGradient(pt.x, pt.y, 2, pt.x, pt.y, radius);
 
       if (heatmapMode === 'surge') {
-        // Rapido Surge Pay Mode: Highlight high hazard earnings zones
+        // Surge Pay Mode: Highlight high hazard earnings zones
         if (cell.band === 'red') {
           grad.addColorStop(0, 'rgba(239, 68, 68, 0.72)');
           grad.addColorStop(0.35, 'rgba(249, 115, 22, 0.45)');
@@ -148,12 +148,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       attributionControl: false,
     });
 
-    // Default: CartoDB Voyager HD — 100% reliable, ultra-vivid roads, zero API key errors
+    // Default: Esri World Street Map & OSM — 100% free, zero API key required, zero watermarks
     const initialTile = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
       {
-        maxZoom: 20,
-        subdomains: 'abcd',
+        maxZoom: 19,
+        attribution: '&copy; Esri, OpenStreetMap',
       }
     ).addTo(map);
 
@@ -216,24 +216,29 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       mapInstanceRef.current.removeLayer(tileLayerRef.current);
     }
 
-    let url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-    let subdomains: string | string[] = 'abcd';
-    let maxZoom = 20;
+    let url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+    let subdomains: string | string[] = 'abc';
+    let maxZoom = 19;
 
     if (mapStyle === 'satellite') {
-      // High-res Esri World Imagery
+      // High-res Esri World Imagery (Free, zero API key required)
       url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
       maxZoom = 19;
     } else if (mapStyle === 'osm') {
-      // OpenStreetMap Standard
+      // OpenStreetMap Standard (Free, zero API key required)
       url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       subdomains = 'abc';
+      maxZoom = 19;
+    } else {
+      // Streets HD: Esri World Street Map (Free, zero API key required)
+      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
       maxZoom = 19;
     }
 
     const newLayer = L.tileLayer(url, {
       maxZoom,
       subdomains,
+      attribution: '&copy; OpenStreetMap, Esri',
     });
 
     newLayer.addTo(mapInstanceRef.current);
@@ -470,18 +475,18 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           🎯
         </button>
 
-        {/* Cycle Tile Layers: Voyager HD / Satellite / OpenStreetMap */}
+        {/* Cycle Tile Layers: Streets HD / Satellite / OpenStreetMap */}
         <button
           onClick={() => {
             const nextMap: Record<MapStyleType, MapStyleType> = {
-              voyager: 'satellite',
+              streets: 'satellite',
               satellite: 'osm',
-              osm: 'voyager',
+              osm: 'streets',
             };
             setMapStyle(nextMap[mapStyle]);
           }}
           className="w-10 h-10 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-amber-200/80 flex items-center justify-center shadow-lg transition text-base active:scale-95"
-          title={`Map Layer: ${mapStyle.toUpperCase()} (Tap to switch satellite/streets)`}
+          title={`Map Layer: ${mapStyle.toUpperCase()} (Tap to switch streets / satellite / OSM)`}
         >
           {mapStyle === 'satellite' ? '🛰️' : mapStyle === 'osm' ? '🌐' : '🗺️'}
         </button>
@@ -491,8 +496,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       <div className="absolute top-3 left-3 z-[1000] bg-white/95 backdrop-blur-md px-3 py-1 rounded-full border border-amber-200 shadow-md text-[10px] text-slate-700 font-extrabold flex items-center gap-1.5 pointer-events-auto">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         <span>
-          {mapStyle === 'voyager'
-            ? 'VOYAGER HD STREETS · ACTIVE'
+          {mapStyle === 'streets'
+            ? 'STREETS HD · ACTIVE'
             : mapStyle === 'satellite'
             ? 'ESRI SATELLITE · ACTIVE'
             : 'OPENSTREETMAP · ACTIVE'}
@@ -553,11 +558,11 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             </div>
           </div>
 
-          {/* Rapido Surcharge Bonus Tag in this Zone */}
+          {/* Surcharge Bonus Tag in this Zone */}
           <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-2xl px-3 py-2 text-xs">
             <div className="flex items-center gap-1.5">
               <span>💰</span>
-              <span className="font-extrabold text-emerald-900">Rapido Heat Hazard Pay:</span>
+              <span className="font-extrabold text-emerald-900">Heat Hazard Pay:</span>
             </div>
             <span className="font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full text-[11px]">
               {selectedCell.band === 'red' ? '+₹25/trip Active' : selectedCell.band === 'yellow' ? '+₹15/trip' : 'Standard'}
