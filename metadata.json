@@ -1,6 +1,10 @@
 {
   "name": "SurakshaRide - Heat-Safety Companion for Delivery Riders",
   "description": "Smart heat-safety companion for gig delivery riders. Tracks personal WBGT heat dose, gives zero-cost spoken breaks, maps free water and shade points, and creates paid-break shift evidence.",
-  "requestFramePermissions": ["geolocation"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

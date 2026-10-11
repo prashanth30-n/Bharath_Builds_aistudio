@@ -39,7 +39,7 @@ export default function App() {
   // Map Engine & API Key: default to 'leaflet' (Voyager HD) for 100% reliable real street maps with zero blockers
   const [mapEngine, setMapEngine] = useState<'leaflet' | 'google'>('leaflet');
   const [apiKeyInput, setApiKeyInput] = useState<string>(
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   );
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [googleMapError, setGoogleMapError] = useState<string | null>(null);
