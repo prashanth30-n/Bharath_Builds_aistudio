@@ -15,7 +15,7 @@ import {
   VoiceNudge,
 } from './types';
 import { SUPPORTED_CITIES, SEED_REST_POINTS, DEMO_TRACE } from './data/cities';
-import { generateCityHeatGrid, getThreeHourForecast } from './utils/grid';
+import { generateCityHeatGrid, generateHeatGridAroundCoord, generateLocalRestPoints, getThreeHourForecast } from './utils/grid';
 import { calculateBearing, calculateDistanceMeters, computeCellId, getAngleDiff } from './utils/wbgt';
 import { playChime, speakWithPollyVoice, unlockAudioContext } from './utils/audio';
 
@@ -55,6 +55,10 @@ export default function App() {
   const [hazardSurgeEarnings, setHazardSurgeEarnings] = useState(125);
   const [waterLoggedMl, setWaterLoggedMl] = useState(750);
   const [gpsMode, setGpsMode] = useState<'trace' | 'real_gps'>('trace');
+  const [gpsActive, setGpsActive] = useState(false);
+  const [isGpsLocating, setIsGpsLocating] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [userGpsCoords, setUserGpsCoords] = useState<{ lat: number; lon: number } | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
   // Rider Profile
@@ -127,7 +131,7 @@ export default function App() {
 
   // Real GPS Geolocation Watcher
   useEffect(() => {
-    if (gpsMode === 'real_gps' && shiftState.status === 'active' && 'geolocation' in navigator) {
+    if (gpsMode === 'real_gps' && 'geolocation' in navigator) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (pos) => {
           const lat = pos.coords.latitude;
@@ -136,14 +140,16 @@ export default function App() {
             ? Math.round(pos.coords.speed * 3.6)
             : captainStatus === 'idle_waiting'
             ? 0
-            : 28;
-          const heading = pos.coords.heading || 180;
+            : 24;
+          const heading = pos.coords.heading || 0;
+          setGpsActive(true);
+          setUserGpsCoords({ lat, lon });
           processPing(lat, lon, speedKmh, heading, captainStatus === 'idle_waiting');
         },
         (err) => {
           console.warn('Real GPS Error / fallback:', err.message);
         },
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 4000, timeout: 10000 }
       );
     } else if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
@@ -155,7 +161,7 @@ export default function App() {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [gpsMode, shiftState.status, captainStatus]);
+  }, [gpsMode, captainStatus]);
 
   // Idle waiting minutes counter
   useEffect(() => {
@@ -202,7 +208,17 @@ export default function App() {
     isIdleWaiting: boolean
   ) => {
     const cellId = computeCellId(lat, lon);
-    const cell = heatGrid.find(c => c.cellId === cellId) || heatGrid[0];
+    let cell = heatGrid.find(c => c.cellId === cellId);
+    if (!cell && heatGrid.length > 0) {
+      let minDist = Infinity;
+      for (const c of heatGrid) {
+        const d = Math.hypot(c.lat - lat, c.lon - lon);
+        if (d < minDist) {
+          minDist = d;
+          cell = c;
+        }
+      }
+    }
     const band = cell ? cell.band : isReplayMode ? 'red' : 'yellow';
     const wbgt = cell ? cell.wbgtC : isReplayMode ? 32.5 : 29.0;
     const tempC = cell ? cell.tempC : isReplayMode ? 43.4 : 32.0;
@@ -288,6 +304,87 @@ export default function App() {
       timestamp: Date.now(),
     });
   };
+
+  // Real GPS acquisition and dynamic local heatmap calibration
+  const handleRequestGps = () => {
+    if (!('geolocation' in navigator)) {
+      setGpsError('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsGpsLocating(true);
+    setGpsError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const speedKmh = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+        const heading = pos.coords.heading || 0;
+
+        setUserGpsCoords({ lat, lon });
+        setGpsActive(true);
+        setIsGpsLocating(false);
+        setGpsMode('real_gps');
+        setIsTracePlaying(false);
+
+        // Dynamically calibrate heat grid centered directly at user's real GPS location!
+        const localHeatGrid = generateHeatGridAroundCoord(lat, lon, isReplayMode);
+        setHeatGrid(localHeatGrid);
+
+        // Generate local hydration & shade points if none within 8km
+        const hasNearby = points.some(p => calculateDistanceMeters(lat, lon, p.lat, p.lon) < 8000);
+        if (!hasNearby) {
+          const localPoints = generateLocalRestPoints(lat, lon);
+          setPoints(localPoints);
+        }
+
+        // Process ping to position rider marker and calculate heat metrics
+        processPing(lat, lon, speedKmh, heading, captainStatus === 'idle_waiting');
+
+        // Fetch live micro-weather from Open-Meteo for exact lat/lon
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m`)
+          .then(res => res.json())
+          .then(data => {
+            if (data?.current?.temperature_2m !== undefined) {
+              const liveTemp = Number(data.current.temperature_2m.toFixed(1));
+              const liveRh = Math.round(data.current.relative_humidity_2m || 45);
+              const liveWind = Number((data.current.wind_speed_10m || 2.5).toFixed(1));
+              const calibratedGrid = generateHeatGridAroundCoord(lat, lon, isReplayMode, {
+                tempC: liveTemp,
+                rh: liveRh,
+                windMs: liveWind,
+              });
+              setHeatGrid(calibratedGrid);
+            }
+          })
+          .catch(e => console.warn('Live meteo sync notice:', e));
+      },
+      (err) => {
+        console.warn('Geolocation acquisition error:', err);
+        setIsGpsLocating(false);
+        let errorMsg = 'Could not acquire GPS';
+        if (err.code === 1) errorMsg = 'Location permission denied by browser';
+        else if (err.code === 2) errorMsg = 'Position unavailable';
+        else if (err.code === 3) errorMsg = 'GPS request timed out';
+        setGpsError(errorMsg);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
+  // Check if browser already has geolocation permission granted and auto-sync
+  useEffect(() => {
+    if ('permissions' in navigator && navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((res) => {
+        if (res.state === 'granted') {
+          handleRequestGps();
+        }
+      }).catch(() => {
+        // Ignore permission query error
+      });
+    }
+  }, []);
 
   // Evaluate Voice Nudges
   const evaluateVoiceNudges = (
@@ -600,6 +697,7 @@ export default function App() {
                     console.warn('Google Map error notice:', err);
                     setGoogleMapError(err);
                   }}
+                  onRequestGps={handleRequestGps}
                 />
               ) : (
                 <MapComponent
@@ -612,6 +710,10 @@ export default function App() {
                   onPointSelect={pt => setTargetPoint(pt)}
                   targetPoint={targetPoint}
                   isVisible={activeTab === 'map'}
+                  onRequestGps={handleRequestGps}
+                  isGpsLocating={isGpsLocating}
+                  gpsActive={gpsActive}
+                  gpsError={gpsError}
                 />
               )}
 
@@ -646,6 +748,22 @@ export default function App() {
 
               {/* Floating Quick Action Chips for Drivers */}
               <div className="absolute top-3 left-3 z-[1000] flex flex-wrap gap-1.5 pointer-events-auto">
+                {/* 1-Tap Real GPS Lock Chip */}
+                <button
+                  onClick={handleRequestGps}
+                  className={`py-1.5 px-3 rounded-full text-xs font-black shadow-md flex items-center gap-1.5 transition active:scale-95 ${
+                    gpsActive
+                      ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sky-500/30'
+                      : isGpsLocating
+                      ? 'bg-amber-500 text-white animate-pulse'
+                      : 'bg-white/95 text-sky-800 border border-sky-300 hover:bg-sky-50'
+                  }`}
+                  title="Lock My Real GPS & Generate Local Heatmap"
+                >
+                  <span>{isGpsLocating ? '⏳' : '📡'}</span>
+                  <span>{gpsActive ? 'GPS Active' : isGpsLocating ? 'Locking GPS...' : 'Use My GPS'}</span>
+                </button>
+
                 <button
                   onClick={() => {
                     const waterPt = points.find(p => p.kind === 'water');
@@ -938,15 +1056,19 @@ export default function App() {
                     onClick={() => {
                       setGpsMode('real_gps');
                       setIsTracePlaying(false);
+                      handleRequestGps();
                     }}
                     className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition ${
                       gpsMode === 'real_gps'
-                        ? 'bg-sky-50 border-sky-400 text-sky-900 shadow-sm'
+                        ? 'bg-sky-50 border-sky-400 text-sky-900 shadow-sm ring-1 ring-sky-400'
                         : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <div className="text-sm font-black mb-0.5">📡 Live Phone GPS</div>
-                    <div className="text-[10px] text-slate-500 font-normal">Tracks your actual bike ride outdoors</div>
+                    <div className="text-sm font-black mb-0.5 flex items-center justify-between">
+                      <span>📡 Live Phone GPS</span>
+                      {gpsActive && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-normal">Tracks your actual bike ride outdoors & builds local heatmap</div>
                   </button>
 
                   <button

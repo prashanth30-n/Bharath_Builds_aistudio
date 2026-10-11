@@ -14,6 +14,7 @@ interface GoogleMapComponentProps {
   targetPoint?: RestPoint | null;
   onSwitchToLeaflet?: () => void;
   onError?: (err: string) => void;
+  onRequestGps?: () => void;
 }
 
 export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
@@ -28,6 +29,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
   targetPoint,
   onSwitchToLeaflet,
   onError,
+  onRequestGps,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapInstance = useRef<google.maps.Map | null>(null);
@@ -295,6 +297,19 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
       googleMapInstance.current.panTo({ lat: currentPing.lat, lng: currentPing.lon });
       googleMapInstance.current.setZoom(16);
     }
+    if (onRequestGps) {
+      onRequestGps();
+    }
+  };
+
+  const handleArrowLocate = () => {
+    if (onRequestGps) {
+      onRequestGps();
+    }
+    if (googleMapInstance.current && currentPing) {
+      googleMapInstance.current.panTo({ lat: currentPing.lat, lng: currentPing.lon });
+      googleMapInstance.current.setZoom(16);
+    }
   };
 
   return (
@@ -344,8 +359,16 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
       {/* Floating Google Maps Controls */}
       <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2 pointer-events-auto">
         <button
+          onClick={handleArrowLocate}
+          className="w-10 h-10 rounded-2xl bg-white/95 hover:bg-white text-sky-700 border border-sky-300 flex items-center justify-center shadow-lg transition active:scale-95 text-base"
+          title="Navigation Arrow: Lock & Track My Live GPS Location"
+        >
+          <span className="text-xl transform -rotate-45 font-black leading-none select-none">➤</span>
+        </button>
+
+        <button
           onClick={handleCenter}
-          className="w-10 h-10 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-amber-200/80 flex items-center justify-center shadow-lg transition active:scale-95"
+          className="w-10 h-10 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-amber-200/80 flex items-center justify-center shadow-lg transition active:scale-95 text-base"
           title="Center on Rider Location"
         >
           🎯

@@ -12,9 +12,13 @@ interface MapComponentProps {
   onPointSelect?: (point: RestPoint) => void;
   targetPoint?: RestPoint | null;
   isVisible?: boolean;
+  onRequestGps?: () => void;
+  isGpsLocating?: boolean;
+  gpsActive?: boolean;
+  gpsError?: string | null;
 }
 
-export type MapStyleType = 'streets' | 'satellite' | 'osm';
+export type MapStyleType = 'osm' | 'satellite' | 'streets';
 export type HeatmapMode = 'radar' | 'surge' | 'shade' | 'grid';
 
 export const MapComponent: React.FC<MapComponentProps> = ({
@@ -27,6 +31,10 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   onPointSelect,
   targetPoint,
   isVisible = true,
+  onRequestGps,
+  isGpsLocating = false,
+  gpsActive = false,
+  gpsError = null,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,7 +45,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   const routeLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const gridShapesLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  const [mapStyle, setMapStyle] = useState<MapStyleType>('streets');
+  const [mapStyle, setMapStyle] = useState<MapStyleType>('osm');
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('radar');
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [inspectCoords, setInspectCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -148,12 +156,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       attributionControl: false,
     });
 
-    // Default: Esri World Street Map & OSM — 100% free, zero API key required, zero watermarks
+    // Default: OpenStreetMap Standard — 100% free, full global street coverage, zero "Map data not available" tiles
     const initialTile = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
         maxZoom: 19,
-        attribution: '&copy; Esri, OpenStreetMap',
+        maxNativeZoom: 19,
+        subdomains: 'abc',
+        attribution: '&copy; OpenStreetMap contributors',
       }
     ).addTo(map);
 
@@ -216,29 +226,34 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       mapInstanceRef.current.removeLayer(tileLayerRef.current);
     }
 
-    let url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+    let url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     let subdomains: string | string[] = 'abc';
     let maxZoom = 19;
+    let maxNativeZoom = 19;
 
     if (mapStyle === 'satellite') {
-      // High-res Esri World Imagery (Free, zero API key required)
+      // High-res Esri World Imagery (cap maxNativeZoom at 18 to prevent "Map data not available" tile)
       url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
       maxZoom = 19;
-    } else if (mapStyle === 'osm') {
-      // OpenStreetMap Standard (Free, zero API key required)
+      maxNativeZoom = 18;
+    } else if (mapStyle === 'streets') {
+      // Streets: Esri World Street Map (cap maxNativeZoom at 17 to prevent missing Asian tiles)
+      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+      maxZoom = 19;
+      maxNativeZoom = 17;
+    } else {
+      // OpenStreetMap Standard: 100% free, full global street coverage, zero "Map data not available" tiles
       url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       subdomains = 'abc';
       maxZoom = 19;
-    } else {
-      // Streets HD: Esri World Street Map (Free, zero API key required)
-      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-      maxZoom = 19;
+      maxNativeZoom = 19;
     }
 
     const newLayer = L.tileLayer(url, {
       maxZoom,
+      maxNativeZoom,
       subdomains,
-      attribution: '&copy; OpenStreetMap, Esri',
+      attribution: '&copy; OpenStreetMap contributors, Esri',
     });
 
     newLayer.addTo(mapInstanceRef.current);
@@ -449,7 +464,19 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
   const handleCenterOnRider = () => {
     if (mapInstanceRef.current && currentPing) {
-      mapInstanceRef.current.setView([currentPing.lat, currentPing.lon], 15);
+      mapInstanceRef.current.flyTo([currentPing.lat, currentPing.lon], 16, { animate: true, duration: 0.8 });
+    }
+    if (onRequestGps) {
+      onRequestGps();
+    }
+  };
+
+  const handleArrowLocate = () => {
+    if (onRequestGps) {
+      onRequestGps();
+    }
+    if (mapInstanceRef.current && currentPing) {
+      mapInstanceRef.current.flyTo([currentPing.lat, currentPing.lon], 16, { animate: true, duration: 0.8 });
     }
   };
 
@@ -467,41 +494,84 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
       {/* Floating Modern Map Controls (Right Top) */}
       <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2 pointer-events-auto">
+        {/* Navigation Arrow Symbol: Follow / Lock Live GPS */}
+        <button
+          onClick={handleArrowLocate}
+          className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-xl transition active:scale-95 border ${
+            gpsActive
+              ? 'bg-gradient-to-tr from-sky-500 to-blue-600 text-white border-sky-300 ring-2 ring-sky-400/40'
+              : isGpsLocating
+              ? 'bg-amber-500 text-white border-amber-300 animate-pulse'
+              : 'bg-white/95 hover:bg-white text-sky-700 border-sky-200'
+          }`}
+          title="Navigation Arrow: Lock & Track My Live GPS Location"
+        >
+          {isGpsLocating ? (
+            <span className="animate-spin text-base">⏳</span>
+          ) : (
+            <span className="text-xl transform -rotate-45 font-black leading-none select-none">➤</span>
+          )}
+        </button>
+
+        {/* Target Symbol: Re-center Camera on Rider Coordinates */}
         <button
           onClick={handleCenterOnRider}
-          className="w-10 h-10 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-amber-200/80 flex items-center justify-center shadow-lg transition active:scale-95 text-base"
-          title="Center on Rider Location"
+          className="w-11 h-11 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-amber-200/90 flex items-center justify-center shadow-xl transition active:scale-95 text-lg"
+          title="Target Symbol: Center Camera on Current Location"
         >
           🎯
         </button>
 
-        {/* Cycle Tile Layers: Streets HD / Satellite / OpenStreetMap */}
+        {/* Cycle Tile Layers: OpenStreetMap / Esri Satellite / Streets */}
         <button
           onClick={() => {
             const nextMap: Record<MapStyleType, MapStyleType> = {
-              streets: 'satellite',
-              satellite: 'osm',
-              osm: 'streets',
+              osm: 'satellite',
+              satellite: 'streets',
+              streets: 'osm',
             };
             setMapStyle(nextMap[mapStyle]);
           }}
-          className="w-10 h-10 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-amber-200/80 flex items-center justify-center shadow-lg transition text-base active:scale-95"
-          title={`Map Layer: ${mapStyle.toUpperCase()} (Tap to switch streets / satellite / OSM)`}
+          className="w-11 h-11 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-amber-200/90 flex items-center justify-center shadow-xl transition text-lg active:scale-95"
+          title={`Map Layer: ${mapStyle.toUpperCase()} (Tap to switch OSM / Satellite / Streets)`}
         >
           {mapStyle === 'satellite' ? '🛰️' : mapStyle === 'osm' ? '🌐' : '🗺️'}
         </button>
       </div>
 
-      {/* Real Map Layer Active Badge (Top Left) */}
-      <div className="absolute top-3 left-3 z-[1000] bg-white/95 backdrop-blur-md px-3 py-1 rounded-full border border-amber-200 shadow-md text-[10px] text-slate-700 font-extrabold flex items-center gap-1.5 pointer-events-auto">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        <span>
-          {mapStyle === 'streets'
-            ? 'STREETS HD · ACTIVE'
-            : mapStyle === 'satellite'
-            ? 'ESRI SATELLITE · ACTIVE'
-            : 'OPENSTREETMAP · ACTIVE'}
-        </span>
+      {/* Real Map Layer & GPS Status Badges (Top Left) */}
+      <div className="absolute top-3 left-3 z-[1000] flex flex-wrap items-center gap-1.5 pointer-events-auto">
+        <div className="bg-white/95 backdrop-blur-md px-3 py-1 rounded-full border border-amber-200 shadow-md text-[10px] text-slate-700 font-extrabold flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>
+            {mapStyle === 'osm'
+              ? 'OPENSTREETMAP · ACTIVE'
+              : mapStyle === 'satellite'
+              ? 'ESRI SATELLITE · ACTIVE'
+              : 'STREETS · ACTIVE'}
+          </span>
+        </div>
+
+        {gpsActive && (
+          <div className="bg-emerald-500 text-white px-2.5 py-1 rounded-full shadow-md text-[10px] font-black flex items-center gap-1 animate-in fade-in">
+            <span>📍</span>
+            <span>GPS LOCKED</span>
+          </div>
+        )}
+
+        {isGpsLocating && (
+          <div className="bg-sky-500 text-white px-2.5 py-1 rounded-full shadow-md text-[10px] font-black flex items-center gap-1 animate-pulse">
+            <span>📡</span>
+            <span>SEARCHING GPS...</span>
+          </div>
+        )}
+
+        {gpsError && (
+          <div className="bg-rose-500 text-white px-2.5 py-1 rounded-full shadow-md text-[10px] font-black flex items-center gap-1">
+            <span>⚠️</span>
+            <span>{gpsError}</span>
+          </div>
+        )}
       </div>
 
       {/* Interactive Thermal Inspector HUD Card (Pops up when driver taps anywhere on map) */}
